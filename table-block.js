@@ -1,7 +1,7 @@
 ( function ( wp ) {
 	'use strict';
 
-	const { createElement: h, Fragment, useMemo, useState } = wp.element;
+	const { createElement: h, Fragment, useEffect, useMemo, useState } = wp.element;
 	const { Button, PanelBody, ToggleControl } = wp.components;
 	const { InspectorControls, RichText, useBlockProps, useInnerBlocksProps, useBlockEditingMode } = wp.blockEditor;
 	const model = window.pxlmNestedModel;
@@ -18,7 +18,8 @@
 	}
 
 	function TableEdit( { clientId, attributes, setAttributes, isSelected } ) {
-		const [ open, setOpen ] = useState( false );
+		const [ dialogSelection, setDialogSelection ] = useState( null );
+		const [ selecting, setSelecting ] = useState( false );
 		const mode = useBlockEditingMode();
 		const registry = wp.data.useRegistry();
 		const { sections, childSelected } = wp.data.useSelect( ( select ) => {
@@ -27,7 +28,13 @@
 		}, [ clientId ] );
 		const projection = useMemo( () => model.readSections( sections ), [ sections ] );
 		const active = mode === 'default' && ( isSelected || childSelected );
-		const props = useBlockProps( { className: 'wp-block-table' } );
+		const selection = window.pxlmUseCanvasSelection( clientId, projection, { enabled: active && selecting && ! dialogSelection, nested: true } );
+		useEffect( () => {
+			if ( ! active ) {
+				setSelecting( false );
+			}
+		}, [ active ] );
+		const props = useBlockProps( { ref: selection.ref, className: 'wp-block-table' } );
 		const inner = useInnerBlocksProps( tableProps( attributes ), {
 			allowedBlocks: [ 'pxlm/table-section' ], templateLock: 'all', renderAppender: false,
 		} );
@@ -53,29 +60,46 @@
 			className: 'pxlm-table-block-actions', contentEditable: false,
 			role: 'group', 'aria-label': '表の操作',
 		},
-		h( Button, { variant: 'secondary', onClick: () => setOpen( true ) }, 'セルを編集' ),
+		h( Button, {
+			variant: 'secondary', isPressed: selecting, 'aria-pressed': selecting,
+			onClick: () => {
+				if ( ! selecting ) {
+					registry.dispatch( wp.blockEditor.store ).selectBlock( clientId );
+				}
+				setSelecting( ! selecting );
+			},
+		}, 'セル選択' ),
+		selecting && h( window.pxlmTableCanvasMenu, {
+			nested: true, attributes: projection, selection,
+			apply: ( section, rows, updated ) => {
+				if ( projection[ section ] === rows ) {
+					updateTable( { ...projection, [ section ]: updated } );
+				}
+			},
+		} ),
+		h( Button, { variant: 'secondary', onClick: () => setDialogSelection( { section: selection.section, ids: selection.ids } ) }, 'セルを編集' ),
 		h( Button, { variant: 'secondary', onClick: () => addSection( 'head' ) }, 'ヘッダー行を追加' ),
 		h( Button, { variant: 'secondary', onClick: () => addSection( 'foot' ) }, 'フッター行を追加' )
 		);
 
 		return h( Fragment, null,
 			h( 'figure', props,
-				controls,
 				! sections.length && h( Button, { variant: 'secondary', onClick: createTable }, '2行2列の表を作成' ),
 				h( 'table', inner ),
 				( active || ! RichText.isEmpty( attributes.caption ) ) && h( RichText, {
 					tagName: 'figcaption', className: 'wp-element-caption', value: attributes.caption,
 					placeholder: 'キャプションを追加', onChange: ( caption ) => setAttributes( { caption } ),
-				} )
+				} ),
+				controls
 			),
 			h( InspectorControls, null, h( PanelBody, { title: '表の設定' },
 				h( ToggleControl, { label: '列の幅を固定', checked: attributes.hasFixedLayout,
 					onChange: ( hasFixedLayout ) => setAttributes( { hasFixedLayout } ) } )
 			) ),
-			open && h( window.pxlmTableCellDialog, {
-				attributes: projection, nested: true, updateTable,
+			dialogSelection && h( window.pxlmTableCellDialog, {
+				attributes: projection, nested: true, updateTable, selection: dialogSelection,
 				setAttributes: ( updater ) => updateTable( { ...projection, ...updater( projection ) } ),
-				onClose: () => setOpen( false ),
+				onClose: () => setDialogSelection( null ),
 			} )
 		);
 	}

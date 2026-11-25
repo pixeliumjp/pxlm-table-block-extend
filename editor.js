@@ -23,12 +23,80 @@
 		return { row: '行見出し', col: '列見出し' }[ cell.scope ] || '見出し';
 	}
 
-	function CellSelection( { section, rows, layout, apply, attributes, nested, updateTable } ) {
-		const [ selected, select ] = useState( new Set() );
-		const [ anchor, setAnchor ] = useState( null );
+	function changeType( rows, ids, tag, scope ) {
+		const selected = new Set( ids );
+		return rows.map( ( row, r ) => ( {
+			...row,
+			cells: row.cells.map( ( cell, c ) => {
+				if ( ! selected.has( r + ':' + c ) ) {
+					return cell;
+				}
+				const updated = { ...cell, tag };
+				if ( scope ) {
+					updated.scope = scope;
+				} else {
+					delete updated.scope;
+				}
+				return updated;
+			} ),
+		} ) );
+	}
+
+	function cellCommands( rows, layout, ids, nested, apply ) {
+		const combine = nested ? window.pxlmNestedModel.combine : undefined;
+		const makeEmpty = nested ? emptyBlockCell : undefined;
+		const command = ( title, enabled, run, structural = false ) => ( {
+			title, isDisabled: ! enabled, onClick: () => {
+				if ( enabled ) {
+					apply( run(), structural );
+				}
+			},
+		} );
+		const selected = layout.valid && ids.length > 0;
+		const direction = ( title, axis ) => command( title, grid.canMergeDirection( layout, ids, axis ),
+			() => grid.mergeDirection( rows, ids, axis, combine, makeEmpty ), true );
+		return [
+			[
+				command( '行見出し (th)', selected, () => changeType( rows, ids, 'th', 'row' ) ),
+				command( '列見出し (th)', selected, () => changeType( rows, ids, 'th', 'col' ) ),
+				command( '通常セル (td)', selected, () => changeType( rows, ids, 'td' ) ),
+			],
+			[
+				command( 'すべて結合', grid.canMerge( layout, ids ), () => grid.merge( rows, ids, combine ), true ),
+				direction( '横方向に結合', 'horizontal' ),
+				direction( '縦方向に結合', 'vertical' ),
+				command( '結合を解除', grid.canSplit( layout, ids ), () => grid.split( rows, ids, makeEmpty ), true ),
+			],
+		];
+	}
+
+	const emptyRows = [];
+	function CanvasMenu( { selection, attributes, nested = false, apply } ) {
+		const rows = attributes[ selection.section ] || emptyRows;
+		const layout = useMemo( () => grid.layout( rows ), [ rows ] );
+		const controls = cellCommands( rows, layout, selection.ids, nested, ( updated, structural ) => {
+			if ( updated ) {
+				apply( selection.section, rows, updated, structural );
+				if ( structural ) {
+					selection.clear();
+				}
+			}
+		} );
+		const Menu = nested ? wp.components.DropdownMenu : wp.components.ToolbarDropdownMenu;
+		return h( Menu, {
+			label: 'セル操作', text: selection.ids.length ? 'セル操作 (' + selection.ids.length + ')' : 'セル操作',
+			icon: null, noIcons: true, controls,
+		} );
+	}
+
+	function CellSelection( { section, rows, layout, apply, attributes, nested, updateTable, initialIds } ) {
+		const [ selected, select ] = useState( () => new Set( initialIds ) );
+		const [ anchor, setAnchor ] = useState( initialIds?.[ 0 ] ?? null );
 		const byId = useMemo( () => new Map( layout.entries.map( ( entry ) => [ entry.id, entry ] ) ), [ layout ] );
 		const labels = useMemo( () => new Map( layout.entries.map( ( { id, cell } ) => [ id, nested ? window.pxlmNestedModel.label( cell.content ) : cellText( cell.content ) ] ) ), [ layout, nested ] );
 		const ids = Array.from( selected );
+		const [ typeCommands, mergeCommands ] = cellCommands( rows, layout, ids, nested, apply );
+		const commandButton = ( { title, isDisabled, onClick } ) => h( Button, { key: title, variant: 'secondary', disabled: isDisabled, onClick }, title );
 
 		function toggle( id, shift ) {
 			if ( shift && anchor !== null ) {
@@ -45,24 +113,6 @@
 			setAnchor( id );
 		}
 
-		function setType( tag, scope ) {
-			const updated = rows.map( ( row, r ) => ( {
-				...row,
-				cells: row.cells.map( ( cell, c ) => {
-					if ( ! selected.has( r + ':' + c ) ) {
-						return cell;
-					}
-					const updatedCell = { ...cell, tag };
-					if ( scope ) {
-						updatedCell.scope = scope;
-					} else {
-						delete updatedCell.scope;
-					}
-					return updatedCell;
-				} ),
-			} ) );
-			apply( updated );
-		}
 
 		function renderRow( row, r ) {
 			return h( 'tr', { key: r }, row.cells.map( ( cell, c ) => {
@@ -99,14 +149,11 @@
 				action( '選択をクリア', selected.size, () => { select( new Set() ); setAnchor( null ); } )
 			),
 			h( 'div', { className: 'pxlm-table-actions', role: 'group', 'aria-label': 'セルの種類' },
-				action( '行見出し (th)', selected.size, () => setType( 'th', 'row' ) ),
-				action( '列見出し (th)', selected.size, () => setType( 'th', 'col' ) ),
-				action( '通常セル (td)', selected.size, () => setType( 'td' ) )
+				typeCommands.map( commandButton )
 			),
 			h( 'p', null, nested ? '長方形に選んだセルを結合すると、各セルのブロックが左上から行順に並びます。解除後は左上のセルに残ります。' : '隣接するセルを長方形に選ぶと結合できます。内容は左上から行順に改行でつなぎ、結合を解除したときは左上のセルに残します。' ),
 			h( 'div', { className: 'pxlm-table-actions' },
-				action( '結合', grid.canMerge( layout, ids ), () => apply( grid.merge( rows, ids, nested ? window.pxlmNestedModel.combine : undefined ) ) ),
-				action( '結合を解除', grid.canSplit( layout, ids ), () => apply( grid.split( rows, ids, nested ? emptyBlockCell : undefined ) ) )
+				mergeCommands.map( commandButton )
 			),
 			nested && h( 'details', null,
 				h( 'summary', null, '行・列の操作' ),
@@ -131,9 +178,10 @@
 		return { tag, scope, align, content: [] };
 	}
 
-	function CellDialog( { attributes, setAttributes, onClose, nested = false, updateTable } ) {
+	function CellDialog( { attributes, setAttributes, onClose, nested = false, updateTable, selection } ) {
 		const available = Object.keys( sections ).filter( ( key ) => attributes[ key ]?.length );
-		const [ requested, setSection ] = useState( 'body' );
+		const [ initial ] = useState( () => ( { section: selection?.section, rows: attributes[ selection?.section ], ids: selection?.ids } ) );
+		const [ requested, setSection ] = useState( initial.section || 'body' );
 		const section = available.includes( requested ) ? requested : available[ 0 ];
 		const rows = attributes[ section ];
 		const layout = useMemo( () => grid.layout( rows || [] ), [ rows ] );
@@ -159,6 +207,7 @@
 			),
 			layout.valid && rows?.length ? h( CellSelection, {
 				key: section + shape, section, rows, layout, attributes, nested, updateTable,
+				initialIds: section === initial.section && rows === initial.rows ? initial.ids : undefined,
 				apply: ( updated ) => {
 					if ( updated ) {
 						setAttributes( ( current ) => current[ section ] === rows ? { [ section ]: updated } : {} );
@@ -172,8 +221,9 @@
 	function TableTools( { BlockEdit, ...props } ) {
 		const mode = useBlockEditingMode();
 		const registry = wp.data.useRegistry();
-		const [ open, setOpen ] = useState( false );
+		const [ dialogSelection, setDialogSelection ] = useState( null );
 		const [ revision, setRevision ] = useState( 0 );
+		const selection = window.pxlmUseCanvasSelection( props.clientId, props.attributes, { enabled: mode === 'default' && ! dialogSelection, nested: false } );
 		const attributesRef = useRef( props.attributes );
 		attributesRef.current = props.attributes;
 
@@ -192,19 +242,27 @@
 		const enabled = props.isSelected && mode === 'default' && Object.keys( sections ).some( ( key ) => props.attributes[ key ]?.length );
 
 		return h( Fragment, null,
+			h( 'span', { ref: selection.ref, hidden: true } ),
 			h( BlockEdit, { ...props, key: revision, setAttributes: guarded } ),
 			enabled && h( BlockControls, { group: 'other' }, h( ToolbarGroup, null,
-				h( ToolbarButton, { onClick: () => setOpen( true ) }, 'セルを編集' ),
+				h( CanvasMenu, { selection, attributes: props.attributes, apply: ( section, rows, updated, structural ) => {
+					props.setAttributes( ( current ) => current[ section ] === rows ? { [ section ]: updated } : {} );
+					if ( structural ) {
+						setRevision( ( value ) => value + 1 );
+					}
+				} } ),
+				h( ToolbarButton, { onClick: () => setDialogSelection( { section: selection.section, ids: selection.ids } ) }, 'セルを編集' ),
 				h( ToolbarButton, { onClick: () => {
 					const converted = window.pxlmNestedModel.fromCore( props.attributes );
 					registry.dispatch( wp.blockEditor.store ).replaceBlock( props.clientId, converted );
 				} }, 'セルにブロックを使う' )
 			) ),
-			enabled && open && h( CellDialog, { attributes: props.attributes, setAttributes: props.setAttributes, onClose: () => setOpen( false ) } )
+			enabled && dialogSelection && h( CellDialog, { selection: dialogSelection, attributes: props.attributes, setAttributes: props.setAttributes, onClose: () => setDialogSelection( null ) } )
 		);
 	}
 
 	window.pxlmTableCellDialog = CellDialog;
+	window.pxlmTableCanvasMenu = CanvasMenu;
 
 	wp.hooks.addFilter( 'editor.BlockEdit', 'pxlm-table-block-extend/cells', ( BlockEdit ) =>
 		( props ) => props.name === 'core/table' ? h( TableTools, { ...props, BlockEdit } ) : h( BlockEdit, props )
