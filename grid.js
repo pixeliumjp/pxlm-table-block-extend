@@ -121,16 +121,19 @@
 		return Boolean( mergeBounds( selectedEntries( grid, ids ) ) );
 	}
 
-	function merge( rows, ids ) {
+	function joinRichText( entries ) {
+		return entries.map( ( { cell } ) => String( cell.content ?? '' ) )
+			.filter( ( html ) => html.length > 0 ).join( '<br>' );
+	}
+
+	function merge( rows, ids, combine = joinRichText ) {
 		const entries = selectedEntries( layout( rows ), ids );
 		const rect = mergeBounds( entries );
 		if ( ! rect ) {
 			return null;
 		}
 		const anchor = entries[ 0 ];
-		const content = entries.map( ( { cell } ) => String( cell.content ?? '' ) )
-			.filter( ( html ) => html.length > 0 ).join( '<br>' );
-		const merged = { ...anchor.cell, content };
+		const merged = { ...anchor.cell, content: combine( entries ) };
 		delete merged.colspan;
 		delete merged.rowspan;
 		if ( rect.right - rect.left > 1 ) {
@@ -166,7 +169,7 @@
 		return splittable( selectedEntries( grid, ids ) );
 	}
 
-	function split( rows, ids ) {
+	function split( rows, ids, makeEmpty = ( cell ) => ( { ...cell, content: '' } ) ) {
 		const grid = layout( rows );
 		const entries = selectedEntries( grid, ids );
 		if ( ! splittable( entries ) ) {
@@ -185,7 +188,7 @@
 			for ( let row = entry.row; row < entry.row + entry.height; row++ ) {
 				for ( let col = entry.col; col < entry.col + entry.width; col++ ) {
 					const isAnchor = row === entry.row && col === entry.col;
-					byRow[ row ].push( { col, cell: isAnchor ? cell : { ...cell, content: '' } } );
+					byRow[ row ].push( { col, cell: isAnchor ? cell : makeEmpty( cell ) } );
 				}
 			}
 		}

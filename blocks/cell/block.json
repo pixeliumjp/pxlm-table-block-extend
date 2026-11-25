@@ -1,0 +1,22 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "pxlm/table-cell",
+	"title": "表のセル",
+	"category": "design",
+	"icon": "editor-table",
+	"parent": [ "pxlm/table-row" ],
+	"attributes": {
+		"tag": { "type": "string", "enum": [ "td", "th" ], "default": "td" },
+		"scope": { "type": "string" },
+		"align": { "type": "string" },
+		"colspan": { "type": "string" },
+		"rowspan": { "type": "string" }
+	},
+	"supports": {
+		"html": false,
+		"inserter": false,
+		"reusable": false,
+		"customClassName": false
+	}
+}

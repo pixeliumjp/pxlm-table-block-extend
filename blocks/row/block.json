@@ -1,0 +1,16 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "pxlm/table-row",
+	"title": "表の行",
+	"category": "design",
+	"icon": "editor-table",
+	"parent": [ "pxlm/table-section" ],
+	"allowedBlocks": [ "pxlm/table-cell" ],
+	"supports": {
+		"html": false,
+		"inserter": false,
+		"reusable": false,
+		"customClassName": false
+	}
+}

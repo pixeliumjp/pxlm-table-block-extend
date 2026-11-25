@@ -1,0 +1,105 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"category": "text",
+	"supports": {
+		"anchor": true,
+		"align": true,
+		"background": {
+			"__experimentalSkipSerialization": true,
+			"gradient": true
+		},
+		"color": {
+			"__experimentalSkipSerialization": [
+				"text",
+				"background",
+				"gradients"
+			],
+			"gradients": true,
+			"link": true,
+			"__experimentalDefaultControls": {
+				"background": true,
+				"text": true
+			}
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true,
+			"__experimentalDefaultControls": {
+				"margin": false,
+				"padding": false
+			}
+		},
+		"typography": {
+			"__experimentalSkipSerialization": [
+				"textAlign"
+			],
+			"fontSize": true,
+			"lineHeight": true,
+			"__experimentalFontFamily": true,
+			"__experimentalFontStyle": true,
+			"__experimentalFontWeight": true,
+			"__experimentalLetterSpacing": true,
+			"__experimentalTextTransform": true,
+			"__experimentalTextDecoration": true,
+			"textAlign": true,
+			"__experimentalDefaultControls": {
+				"fontSize": true
+			}
+		},
+		"__experimentalBorder": {
+			"__experimentalSkipSerialization": true,
+			"color": true,
+			"style": true,
+			"width": true,
+			"__experimentalDefaultControls": {
+				"color": true,
+				"style": true,
+				"width": true
+			}
+		},
+		"interactivity": {
+			"clientNavigation": true
+		},
+		"html": false
+	},
+	"styles": [
+		{
+			"name": "regular",
+			"label": "Default",
+			"isDefault": true
+		},
+		{
+			"name": "stripes",
+			"label": "Stripes"
+		}
+	],
+	"name": "pxlm/table",
+	"title": "ブロック対応テーブル",
+	"description": "各セルに段落、画像、リストなどのブロックを入れられる表です。",
+	"icon": "editor-table",
+	"allowedBlocks": [
+		"pxlm/table-section"
+	],
+	"attributes": {
+		"hasFixedLayout": {
+			"type": "boolean",
+			"default": true
+		},
+		"caption": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": "figcaption",
+			"role": "content"
+		}
+	},
+	"style": "wp-block-table",
+	"editorStyle": [
+		"wp-block-table-editor",
+		"file:./editor.css"
+	],
+	"selectors": {
+		"root": ".wp-block-pxlm-table > table",
+		"spacing": ".wp-block-pxlm-table"
+	}
+}

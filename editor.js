@@ -23,11 +23,11 @@
 		return { row: '行見出し', col: '列見出し' }[ cell.scope ] || '見出し';
 	}
 
-	function CellSelection( { section, rows, layout, apply } ) {
+	function CellSelection( { section, rows, layout, apply, attributes, nested, updateTable } ) {
 		const [ selected, select ] = useState( new Set() );
 		const [ anchor, setAnchor ] = useState( null );
 		const byId = useMemo( () => new Map( layout.entries.map( ( entry ) => [ entry.id, entry ] ) ), [ layout ] );
-		const labels = useMemo( () => new Map( layout.entries.map( ( { id, cell } ) => [ id, cellText( cell.content ) ] ) ), [ layout ] );
+		const labels = useMemo( () => new Map( layout.entries.map( ( { id, cell } ) => [ id, nested ? window.pxlmNestedModel.label( cell.content ) : cellText( cell.content ) ] ) ), [ layout, nested ] );
 		const ids = Array.from( selected );
 
 		function toggle( id, shift ) {
@@ -103,15 +103,35 @@
 				action( '列見出し (th)', selected.size, () => setType( 'th', 'col' ) ),
 				action( '通常セル (td)', selected.size, () => setType( 'td' ) )
 			),
-			h( 'p', null, '隣接するセルを長方形に選ぶと結合できます。内容は左上から行順に改行でつなぎ、結合を解除したときは左上のセルに残します。' ),
+			h( 'p', null, nested ? '長方形に選んだセルを結合すると、各セルのブロックが左上から行順に並びます。解除後は左上のセルに残ります。' : '隣接するセルを長方形に選ぶと結合できます。内容は左上から行順に改行でつなぎ、結合を解除したときは左上のセルに残します。' ),
 			h( 'div', { className: 'pxlm-table-actions' },
-				action( '結合', grid.canMerge( layout, ids ), () => apply( grid.merge( rows, ids ) ) ),
-				action( '結合を解除', grid.canSplit( layout, ids ), () => apply( grid.split( rows, ids ) ) )
+				action( '結合', grid.canMerge( layout, ids ), () => apply( grid.merge( rows, ids, nested ? window.pxlmNestedModel.combine : undefined ) ) ),
+				action( '結合を解除', grid.canSplit( layout, ids ), () => apply( grid.split( rows, ids, nested ? emptyBlockCell : undefined ) ) )
+			),
+			nested && h( 'details', null,
+				h( 'summary', null, '行・列の操作' ),
+				h( 'p', null, '結合のない表で、基準となるセルを1つ選択してください。' ),
+				h( 'div', { className: 'pxlm-table-actions' },
+					Object.entries( dimensionLabels ).map( ( [ op, label ] ) => h( Button, {
+						key: op, variant: 'secondary',
+						disabled: ids.length !== 1 || ! window.pxlmTableDimensions.canChange( attributes, section, ids[ 0 ], op ),
+						onClick: () => updateTable( window.pxlmTableDimensions.change( attributes, section, ids[ 0 ], op ) ),
+					}, label ) )
+				)
 			)
 		);
 	}
 
-	function CellDialog( { attributes, setAttributes, onClose } ) {
+	const dimensionLabels = {
+		'row-before': '上に行を追加', 'row-after': '下に行を追加', 'row-delete': '行を削除',
+		'column-before': '左に列を追加', 'column-after': '右に列を追加', 'column-delete': '列を削除',
+	};
+
+	function emptyBlockCell( { tag, scope, align } ) {
+		return { tag, scope, align, content: [] };
+	}
+
+	function CellDialog( { attributes, setAttributes, onClose, nested = false, updateTable } ) {
 		const available = Object.keys( sections ).filter( ( key ) => attributes[ key ]?.length );
 		const [ requested, setSection ] = useState( 'body' );
 		const section = available.includes( requested ) ? requested : available[ 0 ];
@@ -122,14 +142,23 @@
 			[ e.id, e.col, e.width, e.height ].join( '/' )
 		).join( ',' ), [ layout ] );
 
+		function addSection( name ) {
+			setAttributes( ( current ) => ( { [ name ]: guardNativeEdit.appendSectionRow( current, name ) } ) );
+			setSection( name );
+		}
+
 		return h( Modal, { title: 'セルを編集', onRequestClose: onClose, className: 'pxlm-table-dialog' },
+			! nested && h( 'div', { className: 'pxlm-table-actions' },
+				h( Button, { variant: 'secondary', onClick: () => addSection( 'head' ) }, 'ヘッダー行を追加' ),
+				h( Button, { variant: 'secondary', onClick: () => addSection( 'foot' ) }, 'フッター行を追加' )
+			),
 			available.length > 1 && h( 'label', { className: 'pxlm-table-section' }, '編集するセクション',
 				h( 'select', { value: section, onChange: ( e ) => setSection( e.target.value ) },
 					available.map( ( key ) => h( 'option', { key, value: key }, sections[ key ] ) )
 				)
 			),
 			layout.valid && rows?.length ? h( CellSelection, {
-				key: section + shape, section, rows, layout,
+				key: section + shape, section, rows, layout, attributes, nested, updateTable,
 				apply: ( updated ) => {
 					if ( updated ) {
 						setAttributes( ( current ) => current[ section ] === rows ? { [ section ]: updated } : {} );
@@ -151,7 +180,7 @@
 		const notify = useCallback( () => {
 			setRevision( ( value ) => value + 1 );
 			wp.data.dispatch( 'core/notices' ).createWarningNotice(
-				'行・列の構成や列の配置を変えるには、先に「セルを編集」で結合を解除してください。',
+				'本文の行や列の追加・削除、列の文字揃えを行うには、先に「セルを編集」で結合を解除してください。',
 				{ type: 'snackbar', id: 'pxlm-table-structure' }
 			);
 		}, [] );
@@ -165,11 +194,17 @@
 		return h( Fragment, null,
 			h( BlockEdit, { ...props, key: revision, setAttributes: guarded } ),
 			enabled && h( BlockControls, { group: 'other' }, h( ToolbarGroup, null,
-				h( ToolbarButton, { onClick: () => setOpen( true ) }, 'セルを編集' )
+				h( ToolbarButton, { onClick: () => setOpen( true ) }, 'セルを編集' ),
+				h( ToolbarButton, { onClick: () => {
+					const converted = window.pxlmNestedModel.fromCore( props.attributes );
+					registry.dispatch( wp.blockEditor.store ).replaceBlock( props.clientId, converted );
+				} }, 'セルにブロックを使う' )
 			) ),
 			enabled && open && h( CellDialog, { attributes: props.attributes, setAttributes: props.setAttributes, onClose: () => setOpen( false ) } )
 		);
 	}
+
+	window.pxlmTableCellDialog = CellDialog;
 
 	wp.hooks.addFilter( 'editor.BlockEdit', 'pxlm-table-block-extend/cells', ( BlockEdit ) =>
 		( props ) => props.name === 'core/table' ? h( TableTools, { ...props, BlockEdit } ) : h( BlockEdit, props )

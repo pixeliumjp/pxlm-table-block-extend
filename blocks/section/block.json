@@ -1,0 +1,19 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "pxlm/table-section",
+	"title": "表のセクション",
+	"category": "design",
+	"icon": "editor-table",
+	"parent": [ "pxlm/table" ],
+	"allowedBlocks": [ "pxlm/table-row" ],
+	"attributes": {
+		"section": { "type": "string", "enum": [ "head", "body", "foot" ], "default": "body" }
+	},
+	"supports": {
+		"html": false,
+		"inserter": false,
+		"reusable": false,
+		"customClassName": false
+	}
+}
