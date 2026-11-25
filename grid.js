@@ -238,18 +238,22 @@
 		} );
 	}
 
+	function mergedEntries( grid, ids ) {
+		return selectedEntries( grid, ids ).filter( ( e ) => e.width > 1 || e.height > 1 || /^0+$/.test( e.cell.rowspan ) );
+	}
+
 	function splittable( entries ) {
-		return entries.length > 0 && entries.every( ( e ) => e.width > 1 || e.height > 1 || String( e.cell.rowspan ) === '0' ) &&
+		return entries.length > 0 &&
 			entries.reduce( ( sum, e ) => sum + e.width * e.height - 1, 0 ) <= maxNewCellsPerSplit;
 	}
 
 	function canSplit( grid, ids ) {
-		return splittable( selectedEntries( grid, ids ) );
+		return splittable( mergedEntries( grid, ids ) );
 	}
 
 	function split( rows, ids, makeEmpty = ( cell ) => ( { ...cell, content: '' } ) ) {
 		const grid = layout( rows );
-		const entries = selectedEntries( grid, ids );
+		const entries = mergedEntries( grid, ids );
 		if ( ! splittable( entries ) ) {
 			return null;
 		}

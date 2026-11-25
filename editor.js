@@ -3,7 +3,7 @@
 
 	const { createElement: h, Fragment, useCallback, useMemo, useRef, useState } = wp.element;
 	const { BlockControls, useBlockEditingMode } = wp.blockEditor;
-	const { Button, Modal, ToolbarButton, ToolbarGroup } = wp.components;
+	const { Button, Modal, ToolbarDropdownMenu, ToolbarGroup } = wp.components;
 	const sections = { head: 'ヘッダー', body: '本文', foot: 'フッター' };
 
 	function cellText( content ) {
@@ -42,6 +42,12 @@
 		} ) );
 	}
 
+	function menuIcon( name ) {
+		return window.pxlmTableIconBase && h( 'img', {
+			src: window.pxlmTableIconBase + 'table-cell-' + name + '.svg', width: 24, height: 24, alt: '',
+		} );
+	}
+
 	function cellCommands( rows, layout, ids, nested, apply ) {
 		const combine = nested ? window.pxlmNestedModel.combine : undefined;
 		const makeEmpty = nested ? emptyBlockCell : undefined;
@@ -63,15 +69,15 @@
 			],
 			[
 				command( 'すべて結合', grid.canMerge( layout, ids ), () => grid.merge( rows, ids, combine ), true ),
-				direction( '横方向に結合', 'horizontal' ),
 				direction( '縦方向に結合', 'vertical' ),
+				direction( '横方向に結合', 'horizontal' ),
 				command( '結合を解除', grid.canSplit( layout, ids ), () => grid.split( rows, ids, makeEmpty ), true ),
 			],
 		];
 	}
 
 	const emptyRows = [];
-	function CanvasMenu( { selection, attributes, nested = false, apply } ) {
+	function useCanvasCommands( selection, attributes, nested, apply ) {
 		const rows = attributes[ selection.section ] || emptyRows;
 		const layout = useMemo( () => grid.layout( rows ), [ rows ] );
 		const controls = cellCommands( rows, layout, selection.ids, nested, ( updated, structural ) => {
@@ -82,11 +88,8 @@
 				}
 			}
 		} );
-		const Menu = nested ? wp.components.DropdownMenu : wp.components.ToolbarDropdownMenu;
-		return h( Menu, {
-			label: 'セル操作', text: selection.ids.length ? 'セル操作 (' + selection.ids.length + ')' : 'セル操作',
-			icon: null, noIcons: true, controls,
-		} );
+		const icons = [ [ 'th', 'th', 'td' ], [ '01', '02', '03', '04' ] ];
+		return controls.map( ( group, i ) => group.map( ( item, j ) => ( { ...item, icon: menuIcon( icons[ i ][ j ] ) } ) ) );
 	}
 
 	function CellSelection( { section, rows, layout, apply, attributes, nested, updateTable, initialIds } ) {
@@ -112,7 +115,6 @@
 			select( next );
 			setAnchor( id );
 		}
-
 
 		function renderRow( row, r ) {
 			return h( 'tr', { key: r }, row.cells.map( ( cell, c ) => {
@@ -241,28 +243,34 @@
 		), [ props.setAttributes, props.clientId, registry, notify ] );
 		const enabled = props.isSelected && mode === 'default' && Object.keys( sections ).some( ( key ) => props.attributes[ key ]?.length );
 
+		const commands = useCanvasCommands( selection, props.attributes, false, ( section, rows, updated, structural ) => {
+			props.setAttributes( ( current ) => current[ section ] === rows ? { [ section ]: updated } : {} );
+			if ( structural ) {
+				setRevision( ( value ) => value + 1 );
+			}
+		} );
+		const groups = [ ...commands, [
+			{ title: 'セルを編集', icon: 'editor-table', onClick: () => setDialogSelection( { section: selection.section, ids: selection.ids } ) },
+			{ title: 'セルにブロックを使う', icon: 'screenoptions', onClick: () => {
+				const converted = window.pxlmNestedModel.fromCore( props.attributes );
+				registry.dispatch( wp.blockEditor.store ).replaceBlock( props.clientId, converted );
+			} },
+		] ];
+		const native = window.pxlmUseCoreMenu( props.clientId, enabled, groups, selection.ref );
+
 		return h( Fragment, null,
 			h( 'span', { ref: selection.ref, hidden: true } ),
 			h( BlockEdit, { ...props, key: revision, setAttributes: guarded } ),
-			enabled && h( BlockControls, { group: 'other' }, h( ToolbarGroup, null,
-				h( CanvasMenu, { selection, attributes: props.attributes, apply: ( section, rows, updated, structural ) => {
-					props.setAttributes( ( current ) => current[ section ] === rows ? { [ section ]: updated } : {} );
-					if ( structural ) {
-						setRevision( ( value ) => value + 1 );
-					}
-				} } ),
-				h( ToolbarButton, { onClick: () => setDialogSelection( { section: selection.section, ids: selection.ids } ) }, 'セルを編集' ),
-				h( ToolbarButton, { onClick: () => {
-					const converted = window.pxlmNestedModel.fromCore( props.attributes );
-					registry.dispatch( wp.blockEditor.store ).replaceBlock( props.clientId, converted );
-				} }, 'セルにブロックを使う' )
+			native.items,
+			enabled && ! native.available && h( BlockControls, { group: 'other' }, h( ToolbarGroup, null,
+				h( ToolbarDropdownMenu, { label: 'セル操作', icon: 'editor-table', controls: groups } )
 			) ),
 			enabled && dialogSelection && h( CellDialog, { selection: dialogSelection, attributes: props.attributes, setAttributes: props.setAttributes, onClose: () => setDialogSelection( null ) } )
 		);
 	}
 
 	window.pxlmTableCellDialog = CellDialog;
-	window.pxlmTableCanvasMenu = CanvasMenu;
+	window.pxlmUseCanvasCommands = useCanvasCommands;
 
 	wp.hooks.addFilter( 'editor.BlockEdit', 'pxlm-table-block-extend/cells', ( BlockEdit ) =>
 		( props ) => props.name === 'core/table' ? h( TableTools, { ...props, BlockEdit } ) : h( BlockEdit, props )

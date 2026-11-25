@@ -77,6 +77,14 @@
 			}
 
 			function handleEvent( event ) {
+				if ( event.type === 'focusin' ) {
+					const hit = cellAtEvent( event, table );
+					if ( ! nested && hit && attributes[ hit.section ]?.length ) {
+						setSelection( ( previous ) => previous?.section === hit.section && previous.ids.includes( hit.id )
+							? previous : choose( previous, hit.section, hit.id, attributes[ hit.section ], false, false ) );
+					}
+					return;
+				}
 				if ( event.button !== 0 || event.altKey ) {
 					return;
 				}
@@ -101,7 +109,7 @@
 				}
 			}
 
-			const events = [ 'pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'contextmenu' ];
+			const events = [ 'pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'contextmenu', 'focusin' ];
 			for ( const name of events ) {
 				table.addEventListener( name, handleEvent, true );
 			}

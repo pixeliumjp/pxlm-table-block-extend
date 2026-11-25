@@ -146,3 +146,13 @@ test( 'repartitions crossing spans without cloning child blocks or duplicating s
 	assert.equal( a.rowspan, '0' );
 	assert.equal( a.colspan, '2' );
 } );
+
+test( 'unmerges only the spanned cells within a mixed selection', () => {
+	const untouched = { tag: 'td', content: 'outside' };
+	const rows = [ { cells: [ { tag: 'th', scope: 'col', colspan: '2', content: 'a' }, untouched ] } ];
+	assert.equal( canSplit( layout( rows ), [ '0:0', '0:1' ] ), true );
+	const next = split( rows, [ '0:0', '0:1' ] );
+	assert.deepEqual( next[ 0 ].cells.map( ( cell ) => cell.content ), [ 'a', '', 'outside' ] );
+	assert.equal( next[ 0 ].cells[ 2 ], untouched );
+	assert.equal( split( rows, [ '0:0', '99:0' ] ), null );
+} );

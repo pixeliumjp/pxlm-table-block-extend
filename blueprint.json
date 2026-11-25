@@ -7,10 +7,14 @@
   },
   "steps": [
     {
+      "step": "setSiteLanguage",
+      "language": "ja"
+    },
+    {
       "step": "installPlugin",
       "pluginData": {
         "resource": "url",
-        "url": "https://raw.githubusercontent.com/pixeliumjp/pxlm-table-block-extend/main/dist/pxlm-table-block-extend.zip?v=0.3.0"
+        "url": "https://raw.githubusercontent.com/pixeliumjp/pxlm-table-block-extend/v0.4.0/dist/pxlm-table-block-extend.zip"
       },
       "options": {
         "activate": true
@@ -21,7 +25,7 @@
     },
     {
       "step": "runPHP",
-      "code": "<?php\nrequire '/wordpress/wp-load.php';\n\n$content = <<<'BLOCKS'\n<!-- wp:paragraph -->\n<p>「ホール」をクリックし、「ワークショップ」を Shift＋クリックして 2 行 × 3 列を選びます。ツールバーの「セル操作」から「横方向に結合」「縦方向に結合」「すべて結合」を試せます。</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>「セルを編集」からはヘッダー行やフッター行を追加できます。画像やリストを入れるには「セルにブロックを使う」で表を変換します。変換後は「セル選択」をオンにすると、タップでもセルを選べます。</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:table -->\n<figure class=\"wp-block-table\"><table class=\"has-fixed-layout\"><tbody><tr><td>会場</td><td>午前</td><td>午後</td></tr><tr><td>ホール</td><td>講演</td><td>交流会</td></tr><tr><td>会議室</td><td>個別相談</td><td>ワークショップ</td></tr></tbody></table></figure>\n<!-- /wp:table -->\nBLOCKS;\n\n$post_id = wp_insert_post( array(\n    'import_id'    => 1200,\n    'post_type'    => 'post',\n    'post_status'  => 'draft',\n    'post_title'   => 'サンプル：イベントの時間割',\n    'post_content' => $content,\n    'post_author'  => 1,\n), true );\nif ( is_wp_error( $post_id ) || 1200 !== $post_id ) {\n    throw new RuntimeException( 'Could not create the demo post.' );\n}\n"
+      "code": "<?php\nrequire '/wordpress/wp-load.php';\n\n$content = <<<'BLOCKS'\n<!-- wp:paragraph -->\n<p>「ホール」をクリックし、「ワークショップ」を Shift＋クリックして 2 行 × 3 列を選びます。ツールバーの表アイコン「表を編集」を開くと、行・列の操作と一緒に「横方向に結合」「縦方向に結合」「すべて結合」が並びます。</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>表を選んで設定サイドバーの「レスポンシブ表示」を開くと、横スクロールやモバイルでの縦並びを試せます。セルに画像やリストを入れるには「表を編集」→「セルにブロックを使う」を選びます。</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:table -->\n<figure class=\"wp-block-table\"><table class=\"has-fixed-layout\"><tbody><tr><td>会場</td><td>午前</td><td>午後</td></tr><tr><td>ホール</td><td>講演</td><td>交流会</td></tr><tr><td>会議室</td><td>個別相談</td><td>ワークショップ</td></tr></tbody></table></figure>\n<!-- /wp:table -->\nBLOCKS;\n\n$post_id = wp_insert_post( array(\n    'import_id'    => 1200,\n    'post_type'    => 'post',\n    'post_status'  => 'draft',\n    'post_title'   => 'サンプル：イベントの時間割',\n    'post_content' => $content,\n    'post_author'  => 1,\n), true );\nif ( is_wp_error( $post_id ) || 1200 !== $post_id ) {\n    throw new RuntimeException( 'Could not create the demo post.' );\n}\n"
     },
     {
       "step": "updateUserMeta",

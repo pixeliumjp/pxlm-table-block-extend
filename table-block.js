@@ -2,7 +2,7 @@
 	'use strict';
 
 	const { createElement: h, Fragment, useEffect, useMemo, useState } = wp.element;
-	const { Button, PanelBody, ToggleControl } = wp.components;
+	const { Button, DropdownMenu, PanelBody, ToggleControl } = wp.components;
 	const { InspectorControls, RichText, useBlockProps, useInnerBlocksProps, useBlockEditingMode } = wp.blockEditor;
 	const model = window.pxlmNestedModel;
 
@@ -20,11 +20,19 @@
 	function TableEdit( { clientId, attributes, setAttributes, isSelected } ) {
 		const [ dialogSelection, setDialogSelection ] = useState( null );
 		const [ selecting, setSelecting ] = useState( false );
+		const [ rememberedCell, setRememberedCell ] = useState( null );
 		const mode = useBlockEditingMode();
 		const registry = wp.data.useRegistry();
-		const { sections, childSelected } = wp.data.useSelect( ( select ) => {
+		const { sections, childSelected, selectedCellId } = wp.data.useSelect( ( select ) => {
 			const editor = select( wp.blockEditor.store );
-			return { sections: editor.getBlocks( clientId ), childSelected: editor.hasSelectedInnerBlock( clientId, true ) };
+			const selected = editor.getSelectedBlockClientId();
+			const parents = selected ? [ selected, ...editor.getBlockParents( selected, true ) ] : [];
+			const owner = parents.find( ( id ) => editor.getBlockName( id ) === 'pxlm/table' );
+			return {
+				sections: editor.getBlocks( clientId ),
+				childSelected: editor.hasSelectedInnerBlock( clientId, true ),
+				selectedCellId: owner === clientId && parents.find( ( id ) => editor.getBlockName( id ) === 'pxlm/table-cell' ),
+			};
 		}, [ clientId ] );
 		const projection = useMemo( () => model.readSections( sections ), [ sections ] );
 		const active = mode === 'default' && ( isSelected || childSelected );
@@ -32,9 +40,24 @@
 		useEffect( () => {
 			if ( ! active ) {
 				setSelecting( false );
+				setRememberedCell( null );
+			} else if ( selectedCellId ) {
+				setRememberedCell( selectedCellId );
 			}
-		}, [ active ] );
-		const props = useBlockProps( { ref: selection.ref, className: 'wp-block-table' } );
+		}, [ active, selectedCellId ] );
+		// Clicking a figure control can select the table before the menu opens.
+		// Retain the actual cell block ID, which is stable when rows move.
+		function rememberCell( event ) {
+			const cell = event.target.closest?.( '[data-type="pxlm/table-cell"]' );
+			if ( cell && cell.closest( 'table' ) === event.currentTarget.querySelector( ':scope > table' ) ) {
+				setRememberedCell( cell.getAttribute( 'data-block' ) );
+			}
+		}
+
+		const props = useBlockProps( {
+			ref: selection.ref, className: 'wp-block-table',
+			onFocusCapture: rememberCell, onPointerDownCapture: rememberCell,
+		} );
 		const inner = useInnerBlocksProps( tableProps( attributes ), {
 			allowedBlocks: [ 'pxlm/table-section' ], templateLock: 'all', renderAppender: false,
 		} );
@@ -56,6 +79,33 @@
 			updateTable( { head: [], body: [ row(), row() ], foot: [] } );
 		}
 
+		const currentCellId = selectedCellId || rememberedCell;
+		const single = useMemo( () => {
+			if ( ! selecting && currentCellId ) {
+				for ( const [ section, rows ] of Object.entries( projection ) ) {
+					for ( const [ r, row ] of rows.entries() ) {
+						const c = row.cells.findIndex( ( cell ) => cell.sourceBlock.clientId === currentCellId );
+						if ( c >= 0 ) {
+							return { section, ids: [ r + ':' + c ] };
+						}
+					}
+				}
+			}
+			return null;
+		}, [ selecting, currentCellId, projection ] );
+		const target = single ? { ...selection, ...single } : selection;
+		const commands = window.pxlmUseCanvasCommands( target, projection, true, ( section, rows, updated ) => {
+			if ( projection[ section ] === rows ) {
+				updateTable( { ...projection, [ section ]: updated } );
+			}
+		} );
+		const tableCommands = [
+			{ title: 'ヘッダー行を追加', icon: 'insert', onClick: () => addSection( 'head' ) },
+			{ title: 'フッター行を追加', icon: 'insert', onClick: () => addSection( 'foot' ) },
+			{ title: 'セルを編集', icon: 'editor-table', onClick: () => setDialogSelection( { section: target.section, ids: target.ids } ) },
+		];
+		const groups = [ ...commands, tableCommands.map( ( item ) => ( { ...item, label: item.title } ) ) ];
+
 		const controls = active && sections.length > 0 && h( 'div', {
 			className: 'pxlm-table-block-actions', contentEditable: false,
 			role: 'group', 'aria-label': '表の操作',
@@ -69,17 +119,7 @@
 				setSelecting( ! selecting );
 			},
 		}, 'セル選択' ),
-		selecting && h( window.pxlmTableCanvasMenu, {
-			nested: true, attributes: projection, selection,
-			apply: ( section, rows, updated ) => {
-				if ( projection[ section ] === rows ) {
-					updateTable( { ...projection, [ section ]: updated } );
-				}
-			},
-		} ),
-		h( Button, { variant: 'secondary', onClick: () => setDialogSelection( { section: selection.section, ids: selection.ids } ) }, 'セルを編集' ),
-		h( Button, { variant: 'secondary', onClick: () => addSection( 'head' ) }, 'ヘッダー行を追加' ),
-		h( Button, { variant: 'secondary', onClick: () => addSection( 'foot' ) }, 'フッター行を追加' )
+		h( DropdownMenu, { label: '表を編集', text: '表を編集', icon: 'editor-table', menuProps: { 'data-pxlm-custom-menu': true }, controls: groups } )
 		);
 
 		return h( Fragment, null,

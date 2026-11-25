@@ -1,0 +1,33 @@
+@media (min-width: 769px) {
+	.wp-block-table.pxlm-scroll-desktop {
+		overflow-x: auto;
+	}
+
+	.wp-block-table.pxlm-has-desktop-width > table {
+		width: var(--pxlm-desktop-table-width);
+		max-width: none;
+	}
+}
+
+@media (max-width: 768px) {
+	.wp-block-table.pxlm-scroll-mobile {
+		overflow-x: auto;
+	}
+
+	.wp-block-table.pxlm-has-mobile-width > table {
+		width: var(--pxlm-mobile-table-width);
+		max-width: none;
+	}
+
+	.wp-block-table.pxlm-stack-mobile > table {
+		display: block;
+		width: 100%;
+	}
+
+	.wp-block-table.pxlm-stack-mobile > table > :is(thead, tbody, tfoot),
+	.wp-block-table.pxlm-stack-mobile > table > :is(thead, tbody, tfoot) > tr,
+	.wp-block-table.pxlm-stack-mobile > table > :is(thead, tbody, tfoot) > tr > :is(th, td) {
+		display: block;
+		width: auto;
+	}
+}
