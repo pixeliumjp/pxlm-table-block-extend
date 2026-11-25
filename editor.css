@@ -1,0 +1,70 @@
+.components-modal__frame.pxlm-table-dialog {
+	width: min(48rem, calc(100% - 2rem));
+}
+
+.pxlm-table-section,
+.pxlm-table-selection,
+.pxlm-table-actions,
+.pxlm-table-footer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.pxlm-table-scroll {
+	max-height: 45vh;
+	overflow: auto;
+	border: 1px solid #949494;
+}
+
+.pxlm-table-scroll table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.pxlm-table-scroll :is(td, th) {
+	border: 1px solid #949494;
+	padding: 0;
+	vertical-align: middle;
+}
+
+.pxlm-table-scroll button {
+	display: block;
+	width: 100%;
+	min-width: 5rem;
+	min-height: 2.75rem;
+	padding: 0.5rem;
+	background: transparent;
+	color: inherit;
+	border: 0;
+	cursor: pointer;
+	font: inherit;
+	overflow-wrap: anywhere;
+}
+
+.pxlm-table-scroll button small {
+	display: block;
+}
+
+.pxlm-table-scroll button[aria-pressed="true"] {
+	background: var(--wp-admin-theme-color, #3858e9);
+	color: white;
+	box-shadow: inset 0 0 0 2px currentColor;
+}
+
+.pxlm-table-scroll button:focus-visible {
+	outline: 3px double currentColor;
+	outline-offset: -5px;
+}
+
+.pxlm-table-selection,
+.pxlm-table-footer {
+	justify-content: space-between;
+	margin-block: 1rem;
+}
+
+.pxlm-table-footer {
+	justify-content: flex-end;
+	margin-bottom: 0;
+}

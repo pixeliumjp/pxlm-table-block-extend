@@ -1,0 +1,41 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "landingPage": "/wp-admin/post.php?post=1200&action=edit",
+  "preferredVersions": {
+    "php": "8.3",
+    "wp": "7.0"
+  },
+  "steps": [
+    {
+      "step": "installPlugin",
+      "pluginData": {
+        "resource": "url",
+        "url": "https://raw.githubusercontent.com/pixeliumjp/pxlm-table-block-extend/main/dist/pxlm-table-block-extend.zip"
+      },
+      "options": {
+        "activate": true
+      },
+      "progress": {
+        "caption": "プラグインを有効化しています"
+      }
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php\nrequire '/wordpress/wp-load.php';\n\n$content = <<<'BLOCKS'\n<!-- wp:paragraph -->\n<p>表の中をクリックし、ツールバーの「セルを編集」を開いてください。「会場」「午前」「午後」を選んで列見出しにしたり、隣り合う時間帯を結合したりできます。</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:table -->\n<figure class=\"wp-block-table\"><table class=\"has-fixed-layout\"><tbody><tr><td>会場</td><td>午前</td><td>午後</td></tr><tr><td>ホール</td><td>講演</td><td>交流会</td></tr><tr><td>会議室</td><td>個別相談</td><td>ワークショップ</td></tr></tbody></table></figure>\n<!-- /wp:table -->\nBLOCKS;\n\n$post_id = wp_insert_post( array(\n    'import_id'    => 1200,\n    'post_type'    => 'post',\n    'post_status'  => 'draft',\n    'post_title'   => 'サンプル：イベントの時間割',\n    'post_content' => $content,\n    'post_author'  => 1,\n), true );\nif ( is_wp_error( $post_id ) || 1200 !== $post_id ) {\n    throw new RuntimeException( 'Could not create the demo post.' );\n}\n"
+    },
+    {
+      "step": "updateUserMeta",
+      "userId": 1,
+      "meta": {
+        "wp_persisted_preferences": {
+          "core/edit-post": {
+            "welcomeGuide": false
+          }
+        }
+      }
+    },
+    {
+      "step": "login"
+    }
+  ]
+}
